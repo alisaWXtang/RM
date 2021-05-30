@@ -1,0 +1,115 @@
+function parseResponse(res, reject, resolve) {
+  if (res.data == null) {
+    reject(new Error(i18n.t('未知异常')))
+    return false
+  } else if ([501, 620, 621].includes(res.data.status)) {
+    return true
+  } else if ([606, 629].includes(res.data.status)) {
+    const authMap = {
+      606: 'noAuth', // 项目级无权限
+      629: 'deleted', //  已删除
+    }
+    // 无权限
+    toNoAuthPage(authMap[res.data.status], res.data)
+    return
+  } else if (res.data.status === 302  || res.data.status === 403 || res.data.status === 401) {
+    // sso 登录
+    login()
+    return false
+  } else if (res.data.status === 418) {
+    return res
+  } else if (res.data.status !== 200) {
+    try {
+      if (res?.headers['content-type'] === 'application/octet-stream') {
+        resolve(res)
+        if (res.status === 200) return true
+      } else {
+        resolve(res.data || res)
+      }
+    } catch (e) {
+      resolve(res.data)
+    }
+    window.$udp.errorMessage(res.data.msg)
+    return false
+  }
+  return true
+}
+
+<!--下载文件-->
+function downloadFile(
+  url,
+  fileName = '未知文件_coteam',
+  method = 'get',
+  payload = {},
+  callback = () => {},
+) {
+  const config = {
+    method,
+    url: getRealUrl(url),
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8;multipart/form-data',
+      language: i18n.locale,
+      Authorization: getAuthorization(),
+      'x-site-domain': `${location.origin}/micro-app/coteam`,
+    },
+    responseType: 'blob',
+  }
+
+  if (method.toUpperCase() === 'GET') {
+    config.params = payload
+  } else {
+    config.data = payload
+  }
+
+  axios(config).then(res => {
+    const fileReader = new FileReader()
+    fileReader.onload = e => {
+      let success = true
+      try {
+        const result = JSON.parse(e.target.result)
+        if (result?.status && result?.status !== 200) {
+          parseResponse(
+            { data: result },
+            function() {},
+            function() {},
+          )
+          success = false
+        }
+      } catch (error) {
+      }
+
+      if (!success) return
+
+      const data = URL.createObjectURL(res.data)
+      const a = document.createElement('a')
+      a.hidden = true
+      a.download = decodeURIComponent(fileName) // 兼容部分加密文件名称
+      a.href = data
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => {
+        // 延迟释放
+        URL.revokeObjectURL(data)
+      }, 0)
+
+      typeof callback === 'function' && callback()
+    }
+
+    fileReader.readAsText(res.data)
+  }).finally(() => {
+    typeof callback === 'function' && callback()
+  })
+}
+
+
+
+
+
+
+
+
+
+
+
+
