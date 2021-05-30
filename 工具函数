@@ -102,7 +102,25 @@ function downloadFile(
   })
 }
 
-
+<!--处理树状数据-->
+handleTreeData(data) {
+  const mappedData = data.map(item => {
+    const mappedItem = {
+      value: item.id,
+      label: item.value,
+      code: item.code,
+      id: item.id
+    }
+    if (item.list) {
+      return {
+        ...mappedItem,
+        children: this.handleTreeData(item.list)
+      }
+    }
+    return mappedItem
+  })
+  return mappedData
+},
 
 
 
